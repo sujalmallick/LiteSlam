@@ -1,5 +1,8 @@
 build/
-*.dll
 *.exe
-*.pdb
+*.dll
 *.obj
+*.pdb
+*.lib
+*.ilk
+*.log

@@ -1,12 +1,12 @@
 #pragma once
 #include <opencv2/opencv.hpp>
-#include <opencv2/features2d.hpp>
+#include <vector>
 
 namespace slam {
 
 class FeatureModule {
 public:
-    FeatureModule(int num_features = 1500);
+    FeatureModule(int num_features = 300);
 
     void detectCPU(const cv::Mat& frame,
                    std::vector<cv::KeyPoint>& keypoints,

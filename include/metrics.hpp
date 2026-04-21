@@ -1,4 +1,5 @@
 #pragma once
+
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <string>
@@ -26,11 +27,11 @@ public:
 
 private:
     int frame_count_ = 0;
-    double last_time_ = cv::getTickCount();
+    double last_time_ = 0;   // 🔥 FIXED (was calling function in header)
     double fps_ = 0;
 
     std::vector<MetricLog> logs_;
     std::map<std::string, double> timer_start_;
 };
 
-}
+} // namespace slam

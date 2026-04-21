@@ -4,11 +4,12 @@
 #include "system.hpp"
 
 int main() {
+    std::cout << cv::cuda::getCudaEnabledDeviceCount() << std::endl;
     try {
         std::cout << std::unitbuf;
         std::cout << "=== Starting SLAM GPU Project ===" << std::endl;
 
-        // 🔥 FIX: correct path (important)
+        // Load video
         cv::VideoCapture cap("../data/sample_video.mp4");
 
         if (!cap.isOpened()) {
@@ -26,8 +27,8 @@ int main() {
         cv::namedWindow("Frame Output", cv::WINDOW_NORMAL);
         cv::namedWindow("Trajectory Path", cv::WINDOW_NORMAL);
 
-        cv::resizeWindow("Frame Output", 800, 640);
-        cv::resizeWindow("Trajectory Path", 700, 700);
+        cv::resizeWindow("Frame Output", 800, 600);
+        cv::resizeWindow("Trajectory Path", 600, 600);
 
         cv::moveWindow("Frame Output", 50, 50);
         cv::moveWindow("Trajectory Path", 900, 50);
@@ -45,17 +46,24 @@ int main() {
                 break;
             }
 
+            // 🔥 Lower resolution (huge FPS boost)
             cv::resize(frame, frame, cv::Size(640, 480));
 
             frame_count++;
-            std::cout << "Frame OK\n";
+
+            // 🔥 Skip alternate frames (2x speed boost)
+            if (frame_count % 2 != 0) continue;
+
+            // SLAM processing
             slam.processFrame(frame);
 
-            if (frame_count % 30 == 0) {
+            // 🔥 Reduce logging (avoid slowdown)
+            if (frame_count % 100 == 0) {
                 std::cout << "Processed " << frame_count << " frames..." << std::endl;
             }
 
-            int key = cv::waitKey(30);
+            // Keyboard
+            int key = cv::waitKey(1);
 
             if (key == 'q' || key == 27) {
                 std::cout << "✓ Quit requested." << std::endl;
