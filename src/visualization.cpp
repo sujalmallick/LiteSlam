@@ -13,82 +13,195 @@ void Visualizer::update(const cv::Mat& frame,
                         const Metrics& metrics,
                         bool gpu_mode) {
 
-    // Clone frame
-    canvas_frame_ = frame.clone();
+    // ── Always ensure canvas_frame_ is BGR (3-channel) ──
+    // This is the fix: no matter if frame is gray or color,
+    // we always work on a 3-channel mat so HUD colors stay correct.
+    if (frame.channels() == 1) {
+        cv::cvtColor(frame, canvas_frame_, cv::COLOR_GRAY2BGR);
+    } else {
+        canvas_frame_ = frame.clone();
+    }
 
-    // Draw keypoints
+    // Draw keypoints (always green, always visible)
     for (const auto& kp : kps) {
-        cv::circle(canvas_frame_, kp.pt, 2, cv::Scalar(0,255,0), -1);
+        cv::circle(canvas_frame_, kp.pt, 3, cv::Scalar(0, 255, 0), -1, cv::LINE_AA);
     }
 
-    // =======================
-    // 🔥 HUD (TOP LEFT)
-    // =======================
+    // ─────────────────────────────────────────────
+    //  HUD PANEL
+    // ─────────────────────────────────────────────
 
-    // FPS
-    cv::putText(canvas_frame_,
-                "FPS: " + std::to_string((int)metrics.getFPS()),
-                cv::Point(10, 30),
-                cv::FONT_HERSHEY_SIMPLEX,
-                0.7,
-                cv::Scalar(0,255,0),
-                2);
+    const int PX   = 14;
+    const int PY   = 14;
+    const int PW   = 230;
+    const int LINE = 26;
 
-    // Mode (CPU / GPU)
-    std::string mode = gpu_mode ? "GPU" : "CPU";
-    cv::Scalar mode_color = gpu_mode ? cv::Scalar(0,255,255) : cv::Scalar(255,200,0);
+    std::string modeStr = gpu_mode ? "GPU" : "CPU";
+    int         fps     = static_cast<int>(metrics.getFPS());
+    std::string featStr = gpu_mode ? "GPU"  : "CPU";
+    std::string prepStr = gpu_mode ? "CUDA" : "CPU";
 
-    cv::putText(canvas_frame_,
-                "Mode: " + mode,
-                cv::Point(10, 60),
-                cv::FONT_HERSHEY_SIMPLEX,
-                0.6,
-                mode_color,
-                2);
+    // View string — read from original frame channels, not canvas
+    std::string viewStr = (frame.channels() == 1) ? "Gray" : "Color";
 
-    // =======================
-    // 🔥 CONTROLS (BOTTOM LEFT)
-    // =======================
+    const int ROWS = 5;
+    const int PH   = 20 + ROWS * LINE + 10;
 
-    cv::Mat overlay = canvas_frame_.clone();
+    // Solid dark background
+    cv::rectangle(canvas_frame_,
+                  cv::Point(PX, PY),
+                  cv::Point(PX + PW, PY + PH),
+                  cv::Scalar(18, 18, 18), -1);
 
-    cv::rectangle(overlay,
-                  cv::Point(10, canvas_frame_.rows - 70),
-                  cv::Point(320, canvas_frame_.rows - 30),
-                  cv::Scalar(30, 30, 30),
-                  -1);
+    // Outer border
+    cv::rectangle(canvas_frame_,
+                  cv::Point(PX, PY),
+                  cv::Point(PX + PW, PY + PH),
+                  cv::Scalar(70, 70, 70), 1);
 
-    cv::addWeighted(overlay, 0.7, canvas_frame_, 0.3, 0, canvas_frame_);
+    // Left cyan accent bar
+    cv::rectangle(canvas_frame_,
+                  cv::Point(PX, PY),
+                  cv::Point(PX + 3, PY + PH),
+                  cv::Scalar(0, 200, 255), -1);
 
-    cv::putText(canvas_frame_,
-                "[C] CPU   [G] GPU   [Q] Quit",
-                cv::Point(20, canvas_frame_.rows - 45),
-                cv::FONT_HERSHEY_SIMPLEX,
-                0.5,
-                cv::Scalar(220, 220, 220),
-                1);
+    // Divider under title
+    const int DIV_Y = PY + 32;
+    cv::line(canvas_frame_,
+             cv::Point(PX + 4, DIV_Y),
+             cv::Point(PX + PW, DIV_Y),
+             cv::Scalar(55, 55, 55), 1);
 
-    // =======================
-    // 🔥 TRAJECTORY
-    // =======================
+    const int TX = PX + 14;
+    const int VX = PX + PW - 70;
+    int       TY = PY + 24;
 
-    canvas_traj_ = cv::Mat::zeros(600, 600, CV_8UC3);
+    // Title
+    cv::putText(canvas_frame_, "SLAM",
+                cv::Point(TX, TY),
+                cv::FONT_HERSHEY_DUPLEX, 0.70,
+                cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
 
-    int cx = 300, cy = 300;
+    // Mode badge
+    cv::Scalar modeColor = gpu_mode ? cv::Scalar(0, 200, 255)
+                                    : cv::Scalar(0, 160, 255);
+    cv::putText(canvas_frame_, modeStr,
+                cv::Point(PX + PW - 52, TY),
+                cv::FONT_HERSHEY_DUPLEX, 0.60,
+                modeColor, 1, cv::LINE_AA);
 
+    TY = DIV_Y + LINE - 2;
+
+    auto row = [&](const std::string& label,
+                   const std::string& value,
+                   cv::Scalar valCol = cv::Scalar(230, 230, 230)) {
+        cv::putText(canvas_frame_, label,
+                    cv::Point(TX, TY),
+                    cv::FONT_HERSHEY_DUPLEX, 0.46,
+                    cv::Scalar(130, 130, 130), 1, cv::LINE_AA);
+        cv::putText(canvas_frame_, value,
+                    cv::Point(VX, TY),
+                    cv::FONT_HERSHEY_DUPLEX, 0.46,
+                    valCol, 1, cv::LINE_AA);
+        TY += LINE;
+    };
+
+    cv::Scalar fpsCol = (fps >= 30) ? cv::Scalar(80,  255,  80)
+                      : (fps >= 15) ? cv::Scalar(0,   200, 255)
+                                    : cv::Scalar(60,   60, 255);
+    row("FPS",     std::to_string(fps), fpsCol);
+    row("Feature", featStr);
+    row("Preproc", prepStr);
+    row("View",    viewStr);
+
+    // ─────────────────────────────────────────────
+    //  CONTROLS BAR
+    // ─────────────────────────────────────────────
+
+    const int ROWS_H = canvas_frame_.rows;
+    const int COLS_W = canvas_frame_.cols;
+    const int BAR_H  = 36;
+
+    cv::rectangle(canvas_frame_,
+                  cv::Point(0, ROWS_H - BAR_H),
+                  cv::Point(COLS_W, ROWS_H),
+                  cv::Scalar(18, 18, 18), -1);
+
+    cv::line(canvas_frame_,
+             cv::Point(0,      ROWS_H - BAR_H),
+             cv::Point(COLS_W, ROWS_H - BAR_H),
+             cv::Scalar(65, 65, 65), 1);
+
+    struct Key { std::string key; std::string desc; };
+    const std::vector<Key> keys = {
+        {"C","CPU"}, {"G","GPU"}, {"M","View"}, {"Q","Quit"}
+    };
+
+    int kx = 18;
+    const int KY = ROWS_H - 11;
+
+    for (const auto& k : keys) {
+        cv::putText(canvas_frame_, k.key + ":",
+                    cv::Point(kx, KY),
+                    cv::FONT_HERSHEY_DUPLEX, 0.46,
+                    cv::Scalar(0, 200, 255), 1, cv::LINE_AA);
+        kx += 22;
+        cv::putText(canvas_frame_, k.desc,
+                    cv::Point(kx, KY),
+                    cv::FONT_HERSHEY_DUPLEX, 0.46,
+                    cv::Scalar(180, 180, 180), 1, cv::LINE_AA);
+        kx += 68;
+
+        if (k.key != "Q") {
+            cv::line(canvas_frame_,
+                     cv::Point(kx - 4, ROWS_H - BAR_H + 8),
+                     cv::Point(kx - 4, ROWS_H - 8),
+                     cv::Scalar(55, 55, 55), 1);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    //  TRAJECTORY
+    // ─────────────────────────────────────────────
+
+    canvas_traj_ = cv::Mat(600, 600, CV_8UC3, cv::Scalar(12, 12, 12));
+
+    for (int g = 0; g <= 600; g += 50) {
+        cv::line(canvas_traj_, cv::Point(g, 0), cv::Point(g, 600),
+                 cv::Scalar(28, 28, 28), 1);
+        cv::line(canvas_traj_, cv::Point(0, g), cv::Point(600, g),
+                 cv::Scalar(28, 28, 28), 1);
+    }
+
+    cv::line(canvas_traj_, cv::Point(300, 0),   cv::Point(300, 600),
+             cv::Scalar(48, 48, 48), 1);
+    cv::line(canvas_traj_, cv::Point(0,   300), cv::Point(600, 300),
+             cv::Scalar(48, 48, 48), 1);
+
+    const int cx = 300, cy = 300;
     for (size_t i = 1; i < trajectory.size(); i++) {
-        cv::Point p1(cx + trajectory[i-1].x * 50,
-                     cy + trajectory[i-1].z * 50);
-
-        cv::Point p2(cx + trajectory[i].x * 50,
-                     cy + trajectory[i].z * 50);
-
-        cv::line(canvas_traj_, p1, p2, cv::Scalar(0,255,0), 2);
+        float t  = static_cast<float>(i) / trajectory.size();
+        uchar gv = static_cast<uchar>(100 + 155 * t);
+        cv::Point p1(cx + trajectory[i-1].x * 50, cy + trajectory[i-1].z * 50);
+        cv::Point p2(cx + trajectory[i].x   * 50, cy + trajectory[i].z   * 50);
+        cv::line(canvas_traj_, p1, p2, cv::Scalar(0, gv, 0), 2, cv::LINE_AA);
     }
+
+    if (!trajectory.empty()) {
+        cv::Point cur(cx + trajectory.back().x * 50,
+                      cy + trajectory.back().z * 50);
+        cv::circle(canvas_traj_, cur, 5,  cv::Scalar(0, 255, 120), -1, cv::LINE_AA);
+        cv::circle(canvas_traj_, cur, 10, cv::Scalar(0, 160,  80),  1, cv::LINE_AA);
+    }
+
+    cv::putText(canvas_traj_, "Trajectory - XZ Plane",
+                cv::Point(12, 22),
+                cv::FONT_HERSHEY_DUPLEX, 0.46,
+                cv::Scalar(90, 90, 90), 1, cv::LINE_AA);
 }
 
 void Visualizer::show() {
-    cv::imshow("Frame Output", canvas_frame_);
+    cv::imshow("Frame Output",    canvas_frame_);
     cv::imshow("Trajectory Path", canvas_traj_);
 }
 

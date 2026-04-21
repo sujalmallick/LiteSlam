@@ -16,9 +16,13 @@ public:
     ~SLAMSystem();
 
     void processFrame(cv::Mat& frame);
-
+void toggleDisplayMode();
+    // Existing toggle (feature pipeline CPU/GPU)
     void toggleMode() { use_gpu_ = !use_gpu_; }
     bool isGPUMode() const { return use_gpu_; }
+
+    // 🔥 NEW: CUDA preprocessing toggle
+    void enableCudaPreprocessing(bool enable);
 
 private:
     FeatureModule feature_engine_;
@@ -29,6 +33,9 @@ private:
     Metrics metrics_;
 
     bool use_gpu_ = false;
+bool show_color_ = true;
+    // 🔥 NEW: preprocessing switch
+    bool use_cuda_preprocessing_ = true;
 
     std::vector<cv::KeyPoint> prev_keypoints_;
     cv::Mat prev_descriptors_cpu_;

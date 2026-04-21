@@ -63,16 +63,24 @@ int main() {
             }
 
             // Keyboard
-            int key = cv::waitKey(1);
+           int key = cv::waitKey(1);
 
-            if (key == 'q' || key == 27) {
-                std::cout << "✓ Quit requested." << std::endl;
-                break;
-            }
-            if (key == 'g' || key == 'G') {
-                slam.toggleMode();
-                std::cout << "✓ Mode toggled." << std::endl;
-            }
+if (key == 'q' || key == 27) break;
+
+if (key == 'g' || key == 'G') {
+    slam.toggleMode();
+    slam.enableCudaPreprocessing(true);
+    std::cout << "GPU + CUDA ON\n";
+}
+
+if (key == 'c' || key == 'C') {
+    slam.enableCudaPreprocessing(false);
+    std::cout << "CPU preprocessing ON\n";
+}
+if (key == 'm' || key == 'M') {
+    slam.toggleDisplayMode();
+    std::cout << "Toggled Color/Grayscale mode\n";
+}
         }
 
         std::cout << "\n=== Done ===\n";
